@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lật Mở Bức Tranh - Template Trò Chơi</title>
+    <style>
+        /* ================= CSS VARIABLES & RESET ================= */
+        :root {
+            --primary: #4361ee;
+            --primary-hover: #3a56d4;
+            --secondary: #2ecc71;
+            --danger: #e74c3c;
+            --warning: #f1c40f;
+            --dark: #2b2d42;
+            --light: #f8f9fa;
+            --gray: #8d99ae;
+            --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --board-bg: #edf2f4;
+            --tile-bg: linear-gradient(135deg, #4361ee, #3f37c9);
+            --tile-color: #ffffff;
+            --transition: all 0.3s ease;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-main);
+            background-color: var(--dark);
+            color: var(--light);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ================= BUTTONS & INPUTS ================= */
+        button {
+            font-family: var(--font-main);
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            outline: none;
+        }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-success { background-color: var(--secondary); color: white; }
+        .btn-success:hover { background-color: #27ae60; }
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .btn-warning { background-color: var(--warning); color: var(--dark); }
+        .btn-secondary { background-color: var(--gray); color: white; }
+        .btn-secondary:hover { background-color: #7f8fa6; }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: var(--font-main);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        /* ================= LAYOUT ================= */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 25px; background-color: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 10;
+        }
+        .game-title { font-size: 24px; font-weight: bold; color: var(--warning); text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .header-controls { display: flex; gap: 10px; }
+        main { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; position: relative; }
+        footer { padding: 10px 25px; text-align: center; background-color: rgba(0, 0, 0, 0.5); font-size: 16px; font-weight: bold; }
+
+        /* ================= GAME BOARD ================= */
+        .board-wrapper {
+            position: relative; width: 100%; max-width: 1280px; aspect-ratio: 16 / 9;
+            background-color: var(--board-bg); border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .secret-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        .empty-image-text { position: absolute; z-index: 2; color: var(--gray); font-size: 20px; font-weight: bold; }
+        
+        /* ĐÃ SỬA: Đổi gap: 0 để loại bỏ kẽ hở trong suốt */
+        .grid-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; gap: 0; z-index: 3; background-color: transparent; }
+        
+        /* ĐÃ SỬA: Thêm border: 1px solid #222 để giả làm kẽ hở nhưng dính chặt vào ô */
+        .tile {
+            background: var(--tile-bg); display: flex; justify-content: center; align-items: center;
+            font-size: 3vw; font-weight: bold; color: var(--tile-color); cursor: pointer;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease, box-shadow 0.3s;
+            transform-style: preserve-3d; box-shadow: inset 0 0 20px rgba(0,0,0,0.2); user-select: none;
+            border: 1px solid #222;
+        }
+        .tile:hover { filter: brightness(1.1); }
+        .tile.opened { opacity: 0; transform: perspective(600px) rotateY(180deg) scale(0.95); pointer-events: none; }
+
+        /* ================= MODALS ================= */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
+            z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-content {
+            background-color: #ffffff; color: var(--dark); width: 90%; max-width: 800px; max-height: 90vh;
+            border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); display: flex; flex-direction: column;
+            transform: scale(0.9); transition: transform 0.3s ease; overflow: hidden;
+        }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background-color: var(--light); }
+        .modal-header h2 { margin: 0; color: var(--primary); font-size: 22px; }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; background-color: var(--light); }
+
+        /* ================= GAMEPLAY INTERACTION ================= */
+        .question-display { text-align: center; padding: 20px 10px; }
+        .q-text { font-size: 32px; font-weight: bold; margin-bottom: 30px; color: var(--dark); line-height: 1.4; }
+        
+        /* Trắc nghiệm */
+        .mcq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .mcq-btn { padding: 15px; font-size: 18px; background: #e8f4fd; border: 2px solid var(--primary); color: var(--primary); border-radius: 8px; font-weight: bold; }
+        .mcq-btn:hover { background: var(--primary); color: white; }
+        
+        /* Tự luận */
+        .text-input-area { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+        .text-input-area input { max-width: 400px; font-size: 18px; margin-bottom: 0; padding: 12px; text-align: center;}
+        
+        .feedback { margin-top: 20px; font-size: 20px; font-weight: bold; min-height: 30px; }
+        .feedback.correct { color: var(--secondary); }
+        .feedback.incorrect { color: var(--danger); }
+
+        /* ================= SETTINGS TABS & EDITOR ================= */
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; }
+        .tab-btn { background: none; color: var(--gray); padding: 10px 20px; font-size: 16px; border-radius: 0; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .q-editor-item { background: #f8f9fa; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .q-editor-item h4 { margin-bottom: 10px; color: var(--primary); }
+        
+        .mcq-setup { background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 10px; }
+        .mcq-option { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .mcq-option input[type="radio"] { width: auto; transform: scale(1.5); cursor: pointer; }
+        .mcq-option input[type="text"] { margin-bottom: 0; }
+
+        /* ================= WIN SCREEN ================= */
+        .win-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(46, 204, 113, 0.95); color: white; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 10; opacity: 0; pointer-events: none; transition: opacity 1s ease;
+        }
+        .win-screen.active { opacity: 1; pointer-events: all; }
+        .win-screen h1 { font-size: 60px; margin-bottom: 10px; text-shadow: 2px 2px 5px rgba(0,0,0,0.3); text-align: center;}
+        
+        /* Utils */
+        .hidden { display: none !important; }
+        .img-preview { width: 100%; max-height: 200px; object-fit: contain; border: 1px dashed #ccc; margin-bottom: 10px; background: #eee; }
+        
+        @media (max-width: 768px) {
+            .mcq-grid { grid-template-columns: 1fr; }
+            .q-text { font-size: 22px; }
+            .header-controls { flex-wrap: wrap; justify-content: flex-end; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="game-title" id="uiGameTitle">TRUY TÌM BÍ MẬT</div>
+        <div class="header-controls">
+            <button class="btn-primary" onclick="openSettings()">⚙ Cài đặt</button>
+            <button class="btn-warning" onclick="resetGame()">🔄 Chơi lại</button>
+            <button class="btn-secondary" onclick="toggleFullScreen()">⛶ Toàn màn hình</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="board-wrapper" id="boardWrapper">
+            <div class="empty-image-text" id="emptyImageText">Chưa có hình ảnh. Vui lòng vào ⚙ Cài đặt.</div>
+            <img class="secret-image" id="uiSecretImage" src="" alt="" style="display: none;">
+            <div class="grid-overlay" id="gridOverlay"></div>
+            
+            <div class="win-screen" id="winScreen">
+                <h1>🎉 CHÚC MỪNG! 🎉</h1>
+                <p style="font-size: 24px;">Bạn đã khám phá toàn bộ bức tranh bí mật!</p>
+                <button class="btn-light" style="margin-top: 20px; color: var(--dark); background: white;" onclick="resetGame()">Chơi lại</button>
+            </div>
+        </div>
+    </main>
+
+    <footer>Tiến độ: <span id="uiProgress">0 / 0</span> ô đã mở</footer>
+
+    <!-- QUESTION MODAL (PLAY MODE) -->
+    <div class="modal-overlay" id="questionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="qmNumber">CÂU 01</h2>
+                <button class="btn-secondary" style="padding: 5px 10px;" onclick="closeQuestionModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="question-display">
+                    <div class="q-text" id="qmText">Nội dung câu hỏi?</div>
+                    <div id="qmInteractionArea"></div>
+                    <div id="qmFeedback" class="feedback"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <span style="font-size: 13px; color: #888; align-self: center;">(Dành cho giáo viên)</span>
+                <button class="btn-secondary" onclick="manualOpenTile()">Mở thủ công (Bỏ qua câu hỏi)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-content" style="max-width: 900px; height: 90vh;">
+            <div class="modal-header">
+                <h2>⚙ Cài đặt Trò chơi</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-success" onclick="saveSettings()">💾 Lưu & Áp dụng</button>
+                    <button class="btn-secondary" style="padding: 5px 10px;" onclick="closeSettings()">✕</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('tabGeneral')">Thông tin chung</button>
+                    <button class="tab-btn" onclick="switchTab('tabQuestions')">Quản lý câu hỏi</button>
+                    <button class="tab-btn" onclick="switchTab('tabData')">Dữ liệu (Nhập/Xuất)</button>
+                </div>
+                <div style="padding: 20px;">
+                    <div id="tabGeneral" class="tab-content active">
+                        <label><b>Tên trò chơi:</b></label>
+                        <input type="text" id="setGameTitle" placeholder="VD: TRUY TÌM BÍ MẬT">
+                        <label><b>Kích thước lưới (Số ô che):</b></label>
+                        <select id="setGridSize" onchange="handleGridSizeChange()">
+                            <option value="3">3 × 3 (9 ô)</option>
+                            <option value="4">4 × 4 (16 ô)</option>
+                            <option value="5">5 × 5 (25 ô)</option>
+                        </select>
+                        <label><b>Hình ảnh bí mật:</b></label>
+                        <input type="file" id="setImageUpload" accept="image/png, image/jpeg, image/webp" onchange="handleImageUpload(event)" style="margin-bottom: 10px;">
+                        <img id="setImagePreview" class="img-preview" src="" alt="Preview" style="display:none;">
+                        <button class="btn-danger" onclick="removeImage()">🗑 Xóa ảnh hiện tại</button>
+                    </div>
+
+                    <div id="tabQuestions" class="tab-content">
+                        <p style="margin-bottom: 15px; color: var(--gray);">Chọn loại câu hỏi và nhập đáp án tương ứng cho từng ô.</p>
+                        <div id="questionsEditorContainer"></div>
+                    </div>
+
+                    <div id="tabData" class="tab-content">
+                        <div style="background: #e8f4fd; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <h3>⬇ Xuất cấu hình (Export)</h3>
+                            <button class="btn-primary" style="margin-top: 10px;" onclick="exportJSON()">⬇ Tải file cấu hình .json</button>
+                        </div>
+                        <div style="background: #fdf2e9; padding: 20px; border-radius: 8px;">
+                            <h3>⬆ Nhập cấu hình (Import)</h3>
+                            <input type="file" id="jsonFileInput" accept=".json" style="display: none;" onchange="importJSON(event)">
+                            <button class="btn-warning" style="margin-top: 10px;" onclick="document.getElementById('jsonFileInput').click()">⬆ Chọn file .json để nhập</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ================= STATE ================= */
+        const STORAGE_KEY = 'pictureRevealGameData_v2';
+        let appState = {
+            version: "2.0",
+            game: { title: "TRUY TÌM BÍ MẬT", gridSize: 4, imageBase64: "", questions: [] },
+            progress: { openedTiles: [] }
+        };
+        let currentActiveTileIndex = -1;
+
+        function initEmptyQuestions(size) {
+            let qs = [];
+            for(let i=0; i<size*size; i++) {
+                qs.push({ id: i, question: "", type: "text", answer: "", options: ["", "", "", ""] });
+            }
+            return qs;
+        }
+
+        window.onload = () => {
+            loadStateFromStorage();
+            if(appState.game.questions.length !== appState.game.gridSize * appState.game.gridSize) {
+                appState.game.questions = initEmptyQuestions(appState.game.gridSize);
+            }
+            applyStateToUI();
+        };
+
+        function loadStateFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    appState = JSON.parse(saved);
+                    appState.game.questions.forEach(q => {
+                        if(!q.type) q.type = "text";
+                        if(!q.options) q.options = ["", "", "", ""];
+                    });
+                } else { appState.game.questions = initEmptyQuestions(4); }
+            } catch (e) { appState.game.questions = initEmptyQuestions(4); }
+        }
+
+        function saveStateToStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+        }
+
+        /* ================= UI RENDERING ================= */
+        function applyStateToUI() {
+            document.getElementById('uiGameTitle').textContent = appState.game.title || "TRUY TÌM BÍ MẬT";
+            document.title = appState.game.title || "Lật Mở Bức Tranh";
+            const imgEl = document.getElementById('uiSecretImage');
+            const emptyText = document.getElementById('emptyImageText');
+            
+            if (appState.game.imageBase64) {
+                imgEl.src = appState.game.imageBase64; imgEl.style.display = 'block'; emptyText.style.display = 'none';
+            } else { imgEl.style.display = 'none'; emptyText.style.display = 'block'; }
+            
+            renderGrid();
+            updateProgress();
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('gridOverlay');
+            const size = appState.game.gridSize;
+            grid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            grid.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+            grid.innerHTML = '';
+            
+            for(let i = 0; i < size*size; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.textContent = i + 1;
+                if(appState.progress.openedTiles.includes(i)) tile.classList.add('opened');
+                tile.onclick = () => handleTileClick(i);
+                grid.appendChild(tile);
+            }
+        }
+
+        function updateProgress() {
+            const total = appState.game.gridSize * appState.game.gridSize;
+            const opened = appState.progress.openedTiles.length;
+            document.getElementById('uiProgress').textContent = `${opened} / ${total}`;
+            if (opened === total && total > 0) document.getElementById('winScreen').classList.add('active');
+            else document.getElementById('winScreen').classList.remove('active');
+        }
+
+        /* ================= GAMEPLAY LOGIC ================= */
+        function handleTileClick(index) {
+            if(appState.progress.openedTiles.includes(index)) return;
+            currentActiveTileIndex = index;
+            const qData = appState.game.questions[index];
+            
+            document.getElementById('qmNumber').textContent = `CÂU THỨ ${index + 1}`;
+            document.getElementById('qmText').textContent = qData.question || "(Chưa có nội dung câu hỏi)";
+            document.getElementById('qmFeedback').textContent = "";
+            document.getElementById('qmFeedback').className = "feedback";
+            
+            const interactArea = document.getElementById('qmInteractionArea');
+            interactArea.innerHTML = "";
+
+            if(qData.type === 'mcq') {
+                const grid = document.createElement('div');
+                grid.className = 'mcq-grid';
+                const labels = ["A", "B", "C", "D"];
+                qData.options.forEach((opt, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'mcq-btn';
+                    btn.textContent = `${labels[idx]}. ${opt}`;
+                    btn.onclick = () => checkAnswer(idx.toString(), qData);
+                    grid.appendChild(btn);
+                });
+                interactArea.appendChild(grid);
+            } else {
+                const wrap = document.createElement('div');
+                wrap.className = 'text-input-area';
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = 'studentTextInput';
+                input.placeholder = "Nhập câu trả lời của bạn...";
+                input.onkeypress = (e) => { if(e.key === 'Enter') submitTextAnswer(qData); }
+                
+                const btn = document.createElement('button');
+                btn.className = 'btn-primary';
+                btn.textContent = 'Gửi trả lời';
+                btn.onclick = () => submitTextAnswer(qData);
+                
+                wrap.appendChild(input);
+                wrap.appendChild(btn);
+                interactArea.appendChild(wrap);
+            }
+
+            document.getElementById('questionModal').classList.add('active');
+            setTimeout(() => {
+                const inputFocus = document.getElementById('studentTextInput');
+                if(inputFocus) inputFocus.focus();
+            }, 100);
+        }
+
+        function submitTextAnswer(qData) {
+            const val = document.getElementById('studentTextInput').value;
+            checkAnswer(val, qData);
+        }
+
+        function checkAnswer(studentAnswer, qData) {
+            const feedback = document.getElementById('qmFeedback');
+            let isCorrect = false;
+
+            if(qData.type === 'mcq') {
+                isCorrect = (studentAnswer === qData.answer.toString());
+            } else {
+                const stdAns = studentAnswer.trim().toLowerCase();
+                const rightAns = qData.answer.trim().toLowerCase();
+                isCorrect = (stdAns === rightAns && rightAns !== "");
+            }
+
+            if(isCorrect) {
+                feedback.textContent = "✅ Chúc mừng! Đáp án chính xác.";
+                feedback.className = "feedback correct";
+                setTimeout(() => { openCurrentTile(); }, 1000);
+            } else {
+                feedback.textContent = "❌ Sai rồi! Hãy thử lại nhé.";
+                feedback.className = "feedback incorrect";
+            }
+        }
+
+        function openCurrentTile() {
+            if(currentActiveTileIndex !== -1 && !appState.progress.openedTiles.includes(currentActiveTileIndex)) {
+                appState.progress.openedTiles.push(currentActiveTileIndex);
+                saveStateToStorage();
+                applyStateToUI();
+            }
+            closeQuestionModal();
+        }
+
+        function manualOpenTile() { openCurrentTile(); }
+        function closeQuestionModal() { document.getElementById('questionModal').classList.remove('active'); currentActiveTileIndex = -1; }
+        
+        function resetGame() {
+            if(confirm("Bạn có chắc muốn đóng lại toàn bộ ô? Dữ liệu câu hỏi vẫn được giữ nguyên.")) {
+                appState.progress.openedTiles = [];
+                saveStateToStorage(); applyStateToUI();
+            }
+        }
+
+        /* ================= SETTINGS LOGIC ================= */
+        function openSettings() {
+            document.getElementById('setGameTitle').value = appState.game.title;
+            document.getElementById('setGridSize').value = appState.game.gridSize;
+            if(appState.game.imageBase64) {
+                document.getElementById('setImagePreview').src = appState.game.imageBase64;
+                document.getElementById('setImagePreview').style.display = 'block';
+            } else { document.getElementById('setImagePreview').style.display = 'none'; }
+            
+            renderQuestionsEditor();
+            document.getElementById('settingsModal').classList.add('active');
+            switchTab('tabGeneral');
+        }
+        function closeSettings() { document.getElementById('settingsModal').classList.remove('active'); }
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+        function handleGridSizeChange() {
+            const newSize = parseInt(document.getElementById('setGridSize').value);
+            const oldSize = appState.game.gridSize;
+            if (newSize !== oldSize) {
+                if(confirm("Đổi số lượng ô sẽ cấu trúc lại danh sách câu hỏi. Bạn có chắc?")) {
+                    let newQuestions = [];
+                    for(let i=0; i<newSize*newSize; i++) {
+                        if(i < appState.game.questions.length) newQuestions.push(appState.game.questions[i]);
+                        else newQuestions.push({ id: i, question: "", type: "text", answer: "", options: ["", "", "", ""] });
+                    }
+                    appState.game.gridSize = newSize;
+                    appState.game.questions = newQuestions;
+                    renderQuestionsEditor();
+                } else { document.getElementById('setGridSize').value = oldSize; }
+            }
+        }
+
+        function renderQuestionsEditor() {
+            const container = document.getElementById('questionsEditorContainer');
+            container.innerHTML = '';
+            appState.game.questions.forEach((q, i) => {
+                const html = `
+                    <div class="q-editor-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="margin: 0;">Ô số ${i + 1}</h4>
+                            <select id="editType_${i}" onchange="toggleEditorType(${i})" style="width: auto; margin: 0; padding: 5px;">
+                                <option value="text" ${q.type === 'text' ? 'selected' : ''}>Nhập đáp án (Tự luận)</option>
+                                <option value="mcq" ${q.type === 'mcq' ? 'selected' : ''}>Trắc nghiệm (4 đáp án)</option>
+                            </select>
+                        </div>
+                        <label>Câu hỏi:</label>
+                        <input type="text" id="editQ_${i}" value="${escapeHtml(q.question)}" placeholder="Nội dung câu hỏi...">
+                        
+                        <!-- TEXT MODE -->
+                        <div id="typeTextWrap_${i}" style="${q.type === 'text' ? 'display:block' : 'display:none'}">
+                            <label>Đáp án đúng:</label>
+                            <input type="text" id="editAnsText_${i}" value="${q.type==='text' ? escapeHtml(q.answer) : ''}" placeholder="Nhập đáp án chính xác...">
+                        </div>
+
+                        <!-- MCQ MODE -->
+                        <div id="typeMcqWrap_${i}" class="mcq-setup" style="${q.type === 'mcq' ? 'display:block' : 'display:none'}">
+                            <label style="color: var(--primary); font-weight: bold;">Điền 4 đáp án & Chọn 1 đáp án đúng (tick tròn):</label>
+                            ${[0,1,2,3].map(optIdx => `
+                                <div class="mcq-option">
+                                    <input type="radio" name="editAnsRadio_${i}" value="${optIdx}" ${q.type === 'mcq' && q.answer == optIdx ? 'checked' : (optIdx==0?'checked':'')}>
+                                    <input type="text" id="editOpt_${i}_${optIdx}" value="${escapeHtml(q.options[optIdx]||'')}" placeholder="Lựa chọn ${['A','B','C','D'][optIdx]}...">
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        function toggleEditorType(index) {
+            const type = document.getElementById(`editType_${index}`).value;
+            if(type === 'text') {
+                document.getElementById(`typeTextWrap_${index}`).style.display = 'block';
+                document.getElementById(`typeMcqWrap_${index}`).style.display = 'none';
+            } else {
+                document.getElementById(`typeTextWrap_${index}`).style.display = 'none';
+                document.getElementById(`typeMcqWrap_${index}`).style.display = 'block';
+            }
+        }
+
+        function saveSettings() {
+            appState.game.title = document.getElementById('setGameTitle').value;
+            appState.game.gridSize = parseInt(document.getElementById('setGridSize').value);
+            
+            for(let i=0; i<appState.game.gridSize*appState.game.gridSize; i++) {
+                const type = document.getElementById(`editType_${i}`).value;
+                appState.game.questions[i].question = document.getElementById(`editQ_${i}`).value;
+                appState.game.questions[i].type = type;
+                
+                if(type === 'text') {
+                    appState.game.questions[i].answer = document.getElementById(`editAnsText_${i}`).value;
+                } else {
+                    appState.game.questions[i].options = [
+                        document.getElementById(`editOpt_${i}_0`).value,
+                        document.getElementById(`editOpt_${i}_1`).value,
+                        document.getElementById(`editOpt_${i}_2`).value,
+                        document.getElementById(`editOpt_${i}_3`).value
+                    ];
+                    const radios = document.getElementsByName(`editAnsRadio_${i}`);
+                    for(let r of radios) { if(r.checked) { appState.game.questions[i].answer = r.value; break; } }
+                }
+            }
+            saveStateToStorage(); applyStateToUI(); closeSettings();
+        }
+
+        function escapeHtml(str) {
+            if(!str) return "";
+            return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        /* ================= IMAGE, IMPORT/EXPORT ================= */
+        function handleImageUpload(e) {
+            const file = e.target.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                resizeImage(ev.target.result, 1920, 1080, (resized) => {
+                    appState.game.imageBase64 = resized;
+                    document.getElementById('setImagePreview').src = resized;
+                    document.getElementById('setImagePreview').style.display = 'block';
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+        function resizeImage(dataUrl, maxWidth, maxHeight, cb) {
+            const img = new Image();
+            img.onload = () => {
+                const cvs = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if(w>h) { if(w>maxWidth) { h*=maxWidth/w; w=maxWidth; } }
+                else { if(h>maxHeight) { w*=maxHeight/h; h=maxHeight; } }
+                cvs.width = w; cvs.height = h;
+                cvs.getContext('2d').drawImage(img, 0, 0, w, h);
+                cb(cvs.toDataURL('image/jpeg', 0.8));
+            };
+            img.src = dataUrl;
+        }
+        function removeImage() {
+            appState.game.imageBase64 = ""; document.getElementById('setImageUpload').value = "";
+            document.getElementById('setImagePreview').style.display = 'none';
+        }
+
+        function exportJSON() {
+            saveSettings();
+            const blob = new Blob([JSON.stringify(appState, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url;
+            a.download = `lat_mo_${appState.game.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        function importJSON(e) {
+            const file = e.target.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const imported = JSON.parse(ev.target.result);
+                    if(imported.game && imported.game.questions) {
+                        imported.game.questions.forEach(q => {
+                            if(!q.type) q.type = "text";
+                            if(!q.options) q.options = ["", "", "", ""];
+                        });
+                        appState = imported; saveStateToStorage(); applyStateToUI(); closeSettings();
+                        alert("Nhập cấu hình thành công!");
+                    } else alert("File JSON không hợp lệ.");
+                } catch(err) { alert("Lỗi khi đọc file JSON."); }
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function toggleFullScreen() {
+            if(!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else if(document.exitFullscreen) document.exitFullscreen();
+        }
+    </script>
+</body>
+</html>
